@@ -1,0 +1,9 @@
+---
+version: 2.1
+
+description: >
+  Run the isort import sorting tool against Python source code.
+  The orb provides commands for installing and executing isort,
+  together with a configurable Python executor.
+display:
+  source_url: "https://github.com/circleci-orbs-mamono210/isort"

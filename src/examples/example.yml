@@ -1,0 +1,22 @@
+---
+description: >
+  Check the checked out code with the default parameters. The job fails as
+  soon as isort finds a file whose imports would change, and "diff" prints
+  the change it would have made so the failure is actionable from the log
+  alone.
+usage:
+  version: 2.1
+  orbs:
+    isort: orbss/isort@x.y.z
+  jobs:
+    execute-isort:
+      executor: isort/default
+      steps:
+        - checkout
+        - isort/install
+        - isort/execute:
+            diff: true
+  workflows:
+    use-my-orb:
+      jobs:
+        - execute-isort

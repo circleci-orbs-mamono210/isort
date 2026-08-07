@@ -1,0 +1,519 @@
+version: 2.1
+
+orbs:
+  isort: orbss/isort@dev:<<pipeline.git.revision>>
+  orb-tools: circleci/orb-tools@11.1
+
+filters: &filters
+  tags:
+    only: /.*/
+
+commands:
+  verify-fixtures:
+    description: >
+      Fail early when the committed fixtures are missing. isort exits 0 when
+      it finds no Python files, so an empty checkout would make every test
+      pass for the wrong reason.
+    steps:
+      - run:
+          name: Verify test fixtures
+          command: |
+            set -euo pipefail
+
+            test -s tests/clean/sorted.py
+            test -s tests/clean/single_line.py
+            test -s tests/clean/long_import.py
+            test -s tests/unsorted/order.py
+            test -s tests/unsorted/black_style.py
+
+            echo 'Fixtures found:'
+            find tests -type f -name '*.py' -print
+
+  write-script-defaults:
+    description: >
+      Write the full set of PARAM_* defaults used by the tests that invoke
+      'src/scripts/execute.sh' directly. Those tests assert on behaviour the
+      orb command cannot express, such as a step that must fail, so they need
+      every parameter the command would otherwise supply.
+    steps:
+      - run:
+          name: Write execute.sh parameter defaults
+          command: |
+            set -euo pipefail
+
+            : > /tmp/execute-defaults.sh
+
+            for name in \
+              CONFIG_ROOT EXTEND_SKIPPED_GLOBS EXTEND_SKIPPED_PATHS \
+              EXTRA_ARGS JOBS KNOWN_FIRST_PARTY KNOWN_LOCAL_FOLDER \
+              KNOWN_THIRD_PARTY LINE_LENGTH MULTI_LINE OUTPUT_FILE PROFILE \
+              PYTHON_VERSION SETTINGS_PATH SKIPPED_GLOBS SKIPPED_PATHS \
+              SRC_PATHS SUPPORTED_EXTENSIONS; do
+              echo "export PARAM_${name}=''" >> /tmp/execute-defaults.sh
+            done
+
+            for name in \
+              ATOMIC COLOR DIFF FILTER_FILES FLOAT_TO_TOP \
+              FORCE_SINGLE_LINE_IMPORTS FORCE_SORT_WITHIN_SECTIONS \
+              IGNORE_WHITESPACE QUIET RESOLVE_ALL_CONFIGS SKIP_GITIGNORE \
+              TRAILING_COMMA USE_PARENTHESES VERBOSE; do
+              echo "export PARAM_${name}='false'" >> /tmp/execute-defaults.sh
+            done
+
+            {
+              echo "export PARAM_CHECK_ONLY='true'"
+              echo "export PARAM_FOLLOW_LINKS='true'"
+              echo "export PARAM_ORDER_BY_TYPE='true'"
+              echo "export PARAM_TARGETS='.'"
+              echo "export PARAM_TEE='true'"
+            } >> /tmp/execute-defaults.sh
+
+            echo 'Defaults written:'
+            cat /tmp/execute-defaults.sh
+
+jobs:
+  command-tests:
+    executor: isort/default
+    steps:
+      - checkout
+      - verify-fixtures
+
+      - isort/install
+
+      # The clean fixtures are already sorted, so the default parameters
+      # must pass.
+      - isort/execute:
+          diff: true
+          targets: tests/clean
+
+  parameter-tests:
+    executor: isort/default
+    steps:
+      - checkout
+      - verify-fixtures
+      - write-script-defaults
+
+      - isort/install:
+          version: "8.0.1"
+
+      # black_style.py is wrapped the way the black profile wraps a long
+      # from-import, so it passes only when the profile reached isort. The
+      # companion test below proves it fails without the profile.
+      - isort/execute:
+          profile: black
+          targets: tests/unsorted/black_style.py
+
+      - run:
+          name: Verify the profile is what makes black_style.py pass
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_TARGETS='tests/unsorted/black_style.py' \
+              bash src/scripts/execute.sh
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo 'black_style.py passed without the black profile'
+              exit 1
+            fi
+
+            echo 'The black profile is what changed the outcome.'
+
+      # The report captures standard error as well, which is where the
+      # 'Imports are incorrectly sorted' lines go, and standard output,
+      # which is where the diff goes.
+      - run:
+          name: Verify the report captures both output streams
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_DIFF='true' \
+            PARAM_OUTPUT_FILE='reports/order.txt' \
+            PARAM_TARGETS='tests/unsorted/order.py' \
+              bash src/scripts/execute.sh
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo 'An unsorted fixture did not fail the step'
+              exit 1
+            fi
+
+            echo 'Report contents:'
+            cat reports/order.txt
+
+            grep -q 'Imports are incorrectly sorted' reports/order.txt
+            grep -q '^+import os' reports/order.txt
+
+      # A re-run has to replace the report rather than leave the previous
+      # one in place.
+      - run:
+          name: Verify the report is truncated between runs
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_DIFF='true' \
+            PARAM_OUTPUT_FILE='reports/order.txt' \
+            PARAM_TARGETS='tests/unsorted/order.py' \
+              bash src/scripts/execute.sh
+            set -e
+
+            occurrences="$(grep -c 'Imports are incorrectly sorted' reports/order.txt)"
+
+            if [ "${occurrences}" -ne 1 ]; then
+              echo "Expected 1 error line, got ${occurrences}"
+              exit 1
+            fi
+
+      # The clean fixtures stop being clean at a shorter line length, so a
+      # failure here is what proves line-length reached isort.
+      - run:
+          name: Verify line-length changed the outcome
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_DIFF='true' \
+            PARAM_LINE_LENGTH='40' \
+            PARAM_OUTPUT_FILE='reports/line-length.txt' \
+            PARAM_TARGETS='tests/clean' \
+              bash src/scripts/execute.sh
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo 'A line length of 40 left the clean fixtures unchanged'
+              exit 1
+            fi
+
+            grep -q 'long_import.py' reports/line-length.txt
+
+      # single_line.py keeps two names on one from-import, which only fails
+      # when force-single-line-imports is honoured.
+      - run:
+          name: Verify force-single-line-imports changed the outcome
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_FORCE_SINGLE_LINE_IMPORTS='true' \
+            PARAM_TARGETS='tests/clean/single_line.py' \
+              bash src/scripts/execute.sh
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo 'force-single-line-imports did not reach isort'
+              exit 1
+            fi
+
+            echo 'force-single-line-imports correctly changed the outcome.'
+
+      # Directory scanning plus a skip. Only tests/clean survives, so this
+      # passes only when the repeated --extend-skip flag is applied.
+      - isort/execute:
+          extend-skipped-paths: unsorted
+          targets: tests
+
+      # A skip does not apply to a file named on the command line unless
+      # filter-files is set.
+      - isort/execute:
+          filter-files: true
+          skipped-paths: order.py black_style.py
+          targets: tests/unsorted/order.py tests/unsorted/black_style.py
+
+      - run:
+          name: Verify a skip is ignored without filter-files
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_SKIPPED_PATHS='order.py' \
+            PARAM_TARGETS='tests/unsorted/order.py' \
+              bash src/scripts/execute.sh
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo 'An explicitly named file was skipped without filter-files'
+              exit 1
+            fi
+
+            echo 'The skip was correctly ignored without filter-files.'
+
+      # 'tee' is what puts the report in the job log. With it disabled the
+      # report must reach the file only.
+      - run:
+          name: Verify tee controls the log output
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            output="$(
+              PARAM_DIFF='true' \
+              PARAM_OUTPUT_FILE='reports/no-tee.txt' \
+              PARAM_TARGETS='tests/unsorted/order.py' \
+              PARAM_TEE='false' \
+                bash src/scripts/execute.sh 2>&1
+            )"
+            set -e
+
+            printf '%s\n' "${output}"
+
+            if printf '%s\n' "${output}" | grep -q '^+import os'; then
+              echo 'The diff reached the log even though tee was disabled'
+              exit 1
+            fi
+
+            grep -q '^+import os' reports/no-tee.txt
+
+            echo 'tee correctly controlled the log output.'
+
+      - store_artifacts:
+          path: reports
+
+      # isort reports a path that does not exist and still exits 0 as long
+      # as another path was processed, so the command has to reject it.
+      - run:
+          name: Verify a missing target fails the step
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            PARAM_TARGETS='tests/clean tests/does-not-exist.py' \
+              bash src/scripts/execute.sh
+            guarded_status=$?
+
+            isort --check-only tests/clean tests/does-not-exist.py
+            isort_status=$?
+            set -e
+
+            if [ "${isort_status}" -ne 0 ]; then
+              echo 'isort now fails on a broken path, so the guard may be redundant'
+              exit 1
+            fi
+
+            if [ "${guarded_status}" -eq 0 ]; then
+              echo 'A missing target did not fail the step'
+              exit 1
+            fi
+
+            echo 'A missing target correctly failed the step.'
+
+      # A step carrying one of these could never fail, because isort returns
+      # before it checks anything.
+      - run:
+          name: Verify no-op arguments are rejected
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            for argument in --show-config --show-files --interactive; do
+              set +e
+              PARAM_EXTRA_ARGS="${argument}" \
+              PARAM_TARGETS='tests/unsorted' \
+                bash src/scripts/execute.sh
+              status=$?
+              set -e
+
+              if [ "${status}" -eq 0 ]; then
+                echo "${argument} was accepted"
+                exit 1
+              fi
+            done
+
+            echo 'No-op arguments were correctly rejected.'
+
+      # colorama is not installed by isort itself, and isort fails with an
+      # error rather than falling back to plain output.
+      - run:
+          name: Verify color requires colorama
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            if python -c 'import colorama' > /dev/null 2>&1; then
+              echo 'colorama is present in this executor, so the guard cannot be exercised here'
+              exit 0
+            fi
+
+            set +e
+            PARAM_COLOR='true' \
+            PARAM_TARGETS='tests/clean' \
+              bash src/scripts/execute.sh
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo 'color was accepted without colorama'
+              exit 1
+            fi
+
+            echo 'color correctly required colorama.'
+
+      # Verify that extra-args is split into an array without Bash pathname
+      # expansion. The value below matches files in the checkout if normal
+      # glob expansion is accidentally performed.
+      - run:
+          name: Verify argument splitting does not expand globs
+          command: |
+            set -euo pipefail
+
+            source /tmp/execute-defaults.sh
+
+            set +e
+            output="$(
+              PARAM_EXTRA_ARGS='--extend-skip-glob tests/*.pyi' \
+              PARAM_TARGETS='tests/clean' \
+                bash src/scripts/execute.sh 2>&1
+            )"
+            status=$?
+            set -e
+
+            printf '%s\n' "${output}"
+
+            if [ "${status}" -ne 0 ]; then
+              echo "Expected the clean fixtures to pass, got ${status}"
+              exit 1
+            fi
+
+            command_line="$(
+              printf '%s\n' "${output}" |
+                grep '^Command:' |
+                head -n 1
+            )"
+
+            # printf %q escapes the literal '*' as '\*'. If Bash expanded the
+            # glob before invoking isort, this string would not exist.
+            if ! printf '%s\n' "${command_line}" |
+              grep -Fq -- 'tests/\*.pyi'; then
+              echo 'extra-args glob was expanded unexpectedly'
+              exit 1
+            fi
+
+            echo 'The glob was preserved as a literal isort argument.'
+
+  write-mode-test:
+    executor: isort/default
+    steps:
+      - checkout
+      - verify-fixtures
+
+      - isort/install:
+          version: "8.0.1"
+
+      # check-only: false is the mode that rewrites the files, so the same
+      # target has to pass a check afterwards.
+      - isort/execute:
+          check-only: false
+          targets: tests/unsorted
+
+      - isort/execute:
+          targets: tests/unsorted
+
+      - run:
+          name: Verify the checkout was actually rewritten
+          command: |
+            set -euo pipefail
+
+            if git diff --quiet -- tests/unsorted; then
+              echo 'Write mode left the fixtures untouched'
+              exit 1
+            fi
+
+            git --no-pager diff -- tests/unsorted
+            git checkout -- tests/unsorted
+
+  install-tests:
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - verify-fixtures
+
+      - isort/install:
+          extras: colors
+          version: "8.0.1"
+
+      # The extra installed above is what makes --color usable, so this step
+      # proves the extras parameter reached pip.
+      - isort/execute:
+          color: true
+          diff: true
+          targets: tests/clean
+
+  resource-class-test:
+    executor:
+      name: isort/default
+      resource_class: medium
+    steps:
+      - checkout
+      - verify-fixtures
+
+      - isort/install:
+          version: "8.0.1"
+
+      - isort/execute:
+          jobs: "2"
+          targets: tests/clean
+
+workflows:
+  test-deploy:
+    jobs:
+      - command-tests:
+          filters: *filters
+
+      - parameter-tests:
+          filters: *filters
+
+      - write-mode-test:
+          filters: *filters
+
+      - install-tests:
+          filters: *filters
+
+      - resource-class-test:
+          filters: *filters
+
+      - orb-tools/pack:
+          filters: *filters
+
+      - orb-tools/publish:
+          orb-name: orbss/isort
+          vcs-type: << pipeline.project.type >>
+          pub-type: production
+          requires:
+            - orb-tools/pack
+            - command-tests
+            - install-tests
+            - parameter-tests
+            - resource-class-test
+            - write-mode-test
+          context: CIRCLECI_ORBS
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/

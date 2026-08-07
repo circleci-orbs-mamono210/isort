@@ -1,0 +1,27 @@
+---
+description: >
+  Run isort on an executor that does not bundle it, such as the CircleCI
+  Python convenience image. Pinning the version keeps the result
+  reproducible, because a new isort release can change how imports are
+  wrapped and report files that used to pass. Options are read from the
+  "[tool.isort]" table of "pyproject.toml".
+usage:
+  version: 2.1
+  orbs:
+    isort: orbss/isort@x.y.z
+  jobs:
+    execute-isort:
+      docker:
+        - image: cimg/python:3.13
+      steps:
+        - checkout
+        - isort/install:
+            version: 8.0.1
+        - isort/execute:
+            diff: true
+            settings-path: pyproject.toml
+            targets: src tests
+  workflows:
+    use-my-orb:
+      jobs:
+        - execute-isort

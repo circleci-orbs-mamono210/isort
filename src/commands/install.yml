@@ -1,0 +1,38 @@
+---
+description: >
+  Install isort with pip. Only needed when the executor image does not
+  bundle isort already, for example when running on 'cimg/python'.
+parameters:
+  extras:
+    default: ''
+    description: >
+      Comma separated list of pip extras to install with isort, for example
+      'colors'. The 'colors' extra pulls in colorama, which the 'color'
+      parameter of the execute command requires. Empty installs isort
+      without extras.
+    type: string
+  packages:
+    default: ''
+    description: >
+      Whitespace separated list of additional pip packages to install
+      alongside isort, for example a formatting or sorting plugin. Each one
+      is passed to pip as a separate requirement and may carry its own
+      version specifier, for example 'somepackage==1.2.3'. Empty installs no
+      additional packages.
+    type: string
+  version:
+    default: ''
+    description: >
+      Version of isort to install, for example '8.0.1'. Empty installs the
+      latest release. Pinning is recommended, because a new isort release can
+      change how imports are wrapped and turn a green pipeline red without
+      any change to the repository.
+    type: string
+steps:
+  - run:
+      name: Install isort
+      environment:
+        PARAM_EXTRAS: '<<parameters.extras>>'
+        PARAM_PACKAGES: '<<parameters.packages>>'
+        PARAM_VERSION: '<<parameters.version>>'
+      command: <<include(scripts/install.sh)>>

@@ -1,0 +1,29 @@
+---
+description: >
+  Check the imports against the black profile. The profile has to match the
+  formatter the project actually uses, because isort and black disagree on
+  how to wrap a long import unless it does. Parameters set alongside the
+  profile override the values it provides, so the line length below wins
+  over the 88 that the black profile sets.
+usage:
+  version: 2.1
+  orbs:
+    isort: orbss/isort@x.y.z
+  jobs:
+    execute-isort:
+      executor: isort/default
+      steps:
+        - checkout
+        - isort/install:
+            version: 8.0.1
+        - isort/execute:
+            diff: true
+            extend-skipped-paths: migrations vendor
+            known-first-party: myproject
+            line-length: "100"
+            profile: black
+            targets: src
+  workflows:
+    use-my-orb:
+      jobs:
+        - execute-isort

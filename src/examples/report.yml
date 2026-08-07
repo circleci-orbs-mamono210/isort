@@ -1,0 +1,28 @@
+---
+description: >
+  Keep the report as a build artifact. isort writes the diff to standard
+  output and the error lines to standard error, so the command captures both
+  into "output-file". CircleCI uploads artifacts even after a step has
+  failed, so the report survives the very run that needs it and no
+  "exit-zero" style parameter is required to store it.
+usage:
+  version: 2.1
+  orbs:
+    isort: orbss/isort@x.y.z
+  jobs:
+    execute-isort:
+      executor: isort/default
+      steps:
+        - checkout
+        - isort/install:
+            extras: colors
+        - isort/execute:
+            diff: true
+            output-file: reports/isort.txt
+            targets: src tests
+        - store_artifacts:
+            path: reports
+  workflows:
+    use-my-orb:
+      jobs:
+        - execute-isort

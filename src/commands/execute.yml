@@ -1,0 +1,315 @@
+---
+description: >
+  Execute isort
+parameters:
+  atomic:
+    default: false
+    description: >
+      Refuse to save output that no longer parses as Python
+      (isort '--atomic'). In check mode it reports a file with a syntax
+      error as such, instead of reporting it as incorrectly sorted like a
+      plain run does.
+    type: boolean
+  check-only:
+    default: true
+    description: >
+      Report files whose imports would change instead of rewriting them
+      (isort '--check-only'). This defaults to true, unlike isort itself,
+      because a CI job should not quietly rewrite the checkout. Set it to
+      false for a job that sorts the imports and then commits or tests the
+      result.
+    type: boolean
+  color:
+    default: false
+    description: >
+      Colour the output (isort '--color'). The CircleCI log renders ANSI
+      colours even though it is not a TTY. Requires colorama, which the
+      install command adds through 'extras: colors'.
+    type: boolean
+  config-root:
+    default: ''
+    description: >
+      Directory whose sub-directories are searched for config files
+      (isort '--config-root'). Only meaningful together with
+      'resolve-all-configs'.
+    type: string
+  diff:
+    default: false
+    description: >
+      Print a unified diff of the changes isort would make instead of
+      applying them (isort '--diff'). In check mode this is what makes a
+      failure actionable from the log alone. It also suppresses writing, so
+      it overrides 'check-only: false'.
+    type: boolean
+  extend-skipped-globs:
+    default: ''
+    description: >
+      Whitespace separated list of extra glob patterns to skip on top of the
+      configured ones (isort '--extend-skip-glob'). Each pattern is passed
+      as its own flag.
+    type: string
+  extend-skipped-paths:
+    default: ''
+    description: >
+      Whitespace separated list of extra file names, directory names or
+      paths to skip on top of isort's built in list
+      (isort '--extend-skip'). Each value is passed as its own flag, because
+      isort does not split these on commas.
+    type: string
+  extra-args:
+    default: ''
+    description: >
+      Whitespace separated list of additional isort arguments, for options
+      this command does not expose, for example '--case-sensitive'. Shell
+      quoting and pathname expansion are not evaluated. '--show-config',
+      '--show-files' and '--interactive' are rejected, because they make
+      isort return before it checks anything.
+    type: string
+  filter-files:
+    default: false
+    description: >
+      Apply the skip settings to files passed on the command line as well
+      (isort '--filter-files'). Without it, skip settings only apply to
+      files isort discovers while walking a directory, so an explicitly
+      listed file is checked even when it is skipped.
+    type: boolean
+  float-to-top:
+    default: false
+    description: >
+      Move every non-indented import to the top of the file
+      (isort '--float-to-top').
+    type: boolean
+  follow-links:
+    default: true
+    description: >
+      Follow symlinks encountered during a recursive search. Set to false to
+      pass isort '--dont-follow-links'.
+    type: boolean
+  force-single-line-imports:
+    default: false
+    description: >
+      Put every 'from' import on its own line
+      (isort '--force-single-line-imports').
+    type: boolean
+  force-sort-within-sections:
+    default: false
+    description: >
+      Sort by module name within a section instead of listing straight
+      imports before 'from' imports
+      (isort '--force-sort-within-sections').
+    type: boolean
+  ignore-whitespace:
+    default: false
+    description: >
+      Ignore whitespace differences while checking
+      (isort '--ignore-whitespace'). Only applies in check mode.
+    type: boolean
+  jobs:
+    default: ''
+    description: >
+      Number of files processed in parallel (isort '--jobs'). A negative
+      value uses the number of processors, which can exceed the CPU quota of
+      a small resource class. Empty processes the files sequentially.
+    type: string
+  known-first-party:
+    default: ''
+    description: >
+      Whitespace separated list of modules to classify as first party
+      (isort '--project'). Each value is passed as its own flag.
+    type: string
+  known-local-folder:
+    default: ''
+    description: >
+      Whitespace separated list of modules to classify as a local folder
+      (isort '--known-local-folder'). Each value is passed as its own flag.
+    type: string
+  known-third-party:
+    default: ''
+    description: >
+      Whitespace separated list of modules to classify as third party
+      (isort '--thirdparty'). Each value is passed as its own flag.
+    type: string
+  line-length:
+    default: ''
+    description: >
+      Maximum length of an import line before it is wrapped
+      (isort '--line-length'). Empty keeps isort's default of 79, the value
+      from the config file, or the value implied by 'profile'.
+    type: string
+  multi-line:
+    default: ''
+    description: >
+      Wrapping mode for imports that exceed the line length
+      (isort '--multi-line'). Accepts a name such as
+      'VERTICAL_HANGING_INDENT' or the equivalent number 0 to 11. Empty
+      keeps isort's default of 'GRID'.
+    type: string
+  order-by-type:
+    default: true
+    description: >
+      Order imports by the case of the name, so constants, classes and
+      functions are grouped separately. Set to false to pass isort
+      '--dont-order-by-type'.
+    type: boolean
+  output-file:
+    default: ''
+    description: >
+      Path to write the report to so it can be stored as an artifact.
+      isort has no option of its own for this, so the command redirects both
+      standard output and standard error, which is where the 'Imports are
+      incorrectly sorted' lines go. Parent directories are created and the
+      file is truncated first.
+    type: string
+  profile:
+    default: ''
+    description: >
+      Base configuration profile (isort '--profile'), for example 'black',
+      'django', 'google' or 'pycharm'. Parameters set alongside it override
+      the values the profile provides.
+    type: string
+  python-version:
+    default: ''
+    description: >
+      Python version whose standard library isort should recognise
+      (isort '--py'), for example '313' or 'auto'. Empty uses the union of
+      all Python 3 versions.
+    type: string
+  quiet:
+    default: false
+    description: >
+      Print errors only (isort '--quiet'). This also suppresses the
+      'Skipped' and 'Broken paths' counts.
+    type: boolean
+  resolve-all-configs:
+    default: false
+    description: >
+      Resolve a config file per sub-directory and sort each file against the
+      closest one (isort '--resolve-all-configs'). Intended for monorepos
+      whose packages carry their own settings.
+    type: boolean
+  settings-path:
+    default: ''
+    description: >
+      Path of the config file, or of the directory config discovery starts
+      from (isort '--settings-path'). Empty lets isort discover
+      '.isort.cfg', 'pyproject.toml', 'setup.cfg', 'tox.ini' and
+      '.editorconfig' from the file's location upwards. A path that does not
+      exist makes isort fail with a traceback.
+    type: string
+  skip-gitignore:
+    default: false
+    description: >
+      Skip the files listed in '.gitignore' (isort '--skip-gitignore'). This
+      shells out to git, so git has to be available in the executor.
+    type: boolean
+  skipped-globs:
+    default: ''
+    description: >
+      Whitespace separated list of glob patterns to skip
+      (isort '--skip-glob'). Each pattern is passed as its own flag and
+      REPLACES the configured list, so prefer 'extend-skipped-globs' unless
+      that is intended.
+    type: string
+  skipped-paths:
+    default: ''
+    description: >
+      Whitespace separated list of file names, directory names or paths to
+      skip (isort '--skip'). Each value is passed as its own flag and
+      REPLACES isort's built in list, which covers '.git', '.tox', '.venv',
+      'build', 'dist', 'node_modules' and similar, so prefer
+      'extend-skipped-paths' unless that is intended.
+    type: string
+  src-paths:
+    default: ''
+    description: >
+      Whitespace separated list of source paths whose modules are treated as
+      first party (isort '--src-path'). Each value is passed as its own
+      flag. isort expands '*' and '**' in these values itself.
+    type: string
+  supported-extensions:
+    default: ''
+    description: >
+      Whitespace separated list of file extensions isort may run against
+      (isort '--extension'), for example 'py pyi'. Each value is passed as
+      its own flag and replaces the default list.
+    type: string
+  targets:
+    default: '.'
+    description: >
+      Whitespace separated list of source files or directories to sort or
+      check. Shell pathname expansion is not performed and isort does not
+      expand globs in file arguments, so every value has to be a real path.
+      The command verifies that up front, because isort reports a missing
+      path and still exits 0 when another path was processed. Paths
+      containing whitespace are not supported.
+    type: string
+  tee:
+    default: true
+    description: >
+      With 'output-file', also print the report to the CircleCI log. Set it
+      to false when the log should stay quiet.
+    type: boolean
+  trailing-comma:
+    default: false
+    description: >
+      Add a trailing comma to wrapped imports that use parentheses
+      (isort '--trailing-comma').
+    type: boolean
+  use-parentheses:
+    default: false
+    description: >
+      Continue over-long lines with parentheses instead of backslashes
+      (isort '--use-parentheses').
+    type: boolean
+  verbose:
+    default: false
+    description: >
+      Print more information about what isort is doing (isort '--verbose'),
+      including why each file was skipped. Helpful when a skip pattern does
+      not behave as expected.
+    type: boolean
+steps:
+  - run:
+      name: Show isort version
+      command: <<include(scripts/show-version.sh)>>
+  - run:
+      name: Execute isort
+      environment:
+        PARAM_ATOMIC: '<<parameters.atomic>>'
+        PARAM_CHECK_ONLY: '<<parameters.check-only>>'
+        PARAM_COLOR: '<<parameters.color>>'
+        PARAM_CONFIG_ROOT: '<<parameters.config-root>>'
+        PARAM_DIFF: '<<parameters.diff>>'
+        PARAM_EXTEND_SKIPPED_GLOBS: '<<parameters.extend-skipped-globs>>'
+        PARAM_EXTEND_SKIPPED_PATHS: '<<parameters.extend-skipped-paths>>'
+        PARAM_EXTRA_ARGS: '<<parameters.extra-args>>'
+        PARAM_FILTER_FILES: '<<parameters.filter-files>>'
+        PARAM_FLOAT_TO_TOP: '<<parameters.float-to-top>>'
+        PARAM_FOLLOW_LINKS: '<<parameters.follow-links>>'
+        PARAM_FORCE_SINGLE_LINE_IMPORTS: '<<parameters.force-single-line-imports>>'
+        PARAM_FORCE_SORT_WITHIN_SECTIONS: '<<parameters.force-sort-within-sections>>'
+        PARAM_IGNORE_WHITESPACE: '<<parameters.ignore-whitespace>>'
+        PARAM_JOBS: '<<parameters.jobs>>'
+        PARAM_KNOWN_FIRST_PARTY: '<<parameters.known-first-party>>'
+        PARAM_KNOWN_LOCAL_FOLDER: '<<parameters.known-local-folder>>'
+        PARAM_KNOWN_THIRD_PARTY: '<<parameters.known-third-party>>'
+        PARAM_LINE_LENGTH: '<<parameters.line-length>>'
+        PARAM_MULTI_LINE: '<<parameters.multi-line>>'
+        PARAM_ORDER_BY_TYPE: '<<parameters.order-by-type>>'
+        PARAM_OUTPUT_FILE: '<<parameters.output-file>>'
+        PARAM_PROFILE: '<<parameters.profile>>'
+        PARAM_PYTHON_VERSION: '<<parameters.python-version>>'
+        PARAM_QUIET: '<<parameters.quiet>>'
+        PARAM_RESOLVE_ALL_CONFIGS: '<<parameters.resolve-all-configs>>'
+        PARAM_SETTINGS_PATH: '<<parameters.settings-path>>'
+        PARAM_SKIP_GITIGNORE: '<<parameters.skip-gitignore>>'
+        PARAM_SKIPPED_GLOBS: '<<parameters.skipped-globs>>'
+        PARAM_SKIPPED_PATHS: '<<parameters.skipped-paths>>'
+        PARAM_SRC_PATHS: '<<parameters.src-paths>>'
+        PARAM_SUPPORTED_EXTENSIONS: '<<parameters.supported-extensions>>'
+        PARAM_TARGETS: '<<parameters.targets>>'
+        PARAM_TEE: '<<parameters.tee>>'
+        PARAM_TRAILING_COMMA: '<<parameters.trailing-comma>>'
+        PARAM_USE_PARENTHESES: '<<parameters.use-parentheses>>'
+        PARAM_VERBOSE: '<<parameters.verbose>>'
+      command: <<include(scripts/execute.sh)>>
