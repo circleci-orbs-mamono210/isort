@@ -1,10 +1,7 @@
 ---
 description: >
-  Check the imports against the black profile. The profile has to match the
-  formatter the project actually uses, because isort and black disagree on
-  how to wrap a long import unless it does. Parameters set alongside the
-  profile override the values it provides, so the line length below wins
-  over the 88 that the black profile sets.
+  Check imports against the black profile. Less common isort options can be
+  passed through "extra-args" instead of being exposed as Orb parameters.
 usage:
   version: 2.1
   orbs:
@@ -18,9 +15,11 @@ usage:
             version: 8.0.1
         - isort/execute:
             diff: true
-            extend-skipped-paths: migrations vendor
-            known-first-party: myproject
-            line-length: "100"
+            extra-args: >-
+              --extend-skip migrations
+              --extend-skip vendor
+              --project myproject
+              --line-length 100
             profile: black
             targets: src
   workflows:

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-08-09
+
+### Changed
+
+* Reduced the public parameters of `isort/execute` to the CI-oriented set: `atomic`, `check-only`, `diff`, `extra-args`, `output-file`, `profile`, `settings-path`, `skip-gitignore`, `targets` and `tee`.
+* Moved less common isort CLI options such as formatting, skip, module-classification and parallel-execution controls to `extra-args` or project configuration files.
+* Simplified `src/scripts/execute.sh` by removing argument-building logic for the deleted Orb parameters.
+* Simplified integration-test defaults so direct script tests only provide the remaining `PARAM_*` values.
+* Updated the profile example to demonstrate passing less common isort options through `extra-args`.
+* Updated the report example to pin isort without installing unused color support.
+* Updated README documentation and examples for the reduced public API.
+
+### Added
+
+* Added integration coverage for `settings-path` and `skip-gitignore` using the reduced public API.
+* Added integration coverage for the `packages` parameter of `isort/install`.
+* Added integration coverage showing that removed options such as `--filter-files`, `--skip`, `--color` and `--jobs` remain usable through `extra-args`.
+
+### Preserved
+
+* `check-only` continues to default to `true` so CI does not silently rewrite the checkout.
+* Missing and empty targets continue to fail before isort is executed.
+* `--show-config`, `--show-files` and `--interactive` continue to be rejected through `extra-args` so a CI gating step cannot silently become a no-op.
+* `output-file` continues to capture both standard output and standard error, and `tee` continues to control whether the report is also written to the CircleCI log.
+
 ## [0.0.1] - 2026-08-08
 
 Initial release of the isort CircleCI Orb.
@@ -53,5 +78,6 @@ Initial release of the isort CircleCI Orb.
 * Prevented a repeated `output-file` step from leaving an earlier report in place.
 * Captured standard error as well as standard output in `output-file`, because isort prints the diff to one and the error lines to the other.
 
-[Unreleased]: https://github.com/circleci-orbs-mamono210/isort/compare/v0.0.1...HEAD
-[0.0.1]: https://github.com/circleci-orbs-mamono210/isort/releases/tag/v0.0.1
+[Unreleased]: https://github.com/circleci-orbs-mamono210/isort/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/circleci-orbs-mamono210/isort/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/circleci-orbs-mamono210/isort/tree/v0.0.1
